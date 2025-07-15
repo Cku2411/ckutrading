@@ -1,0 +1,359 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+type Pair = {
+  symbol: string;
+  lastPrice: string;
+  priceChangePercent: string;
+};
+
+type ExchangeSymbol = {
+  symbol: string;
+  quoteAsset: string;
+  status: string;
+};
+
+type ExchangeInfo = {
+  symbols: ExchangeSymbol[];
+};
+
+type Ticker24hr = {
+  symbol: string;
+  lastPrice: string;
+  priceChangePercent: string;
+};
+
+type SortField = "symbol" | "lastPrice" | "priceChangePercent";
+
+type Timeframe = {
+  label: string;
+  interval: string;
+};
+
+const TIMEFRAMES: Timeframe[] = [
+  { label: "1m", interval: "1" },
+  { label: "5m", interval: "5" },
+  { label: "15m", interval: "15" },
+  { label: "30m", interval: "30" },
+  { label: "1h", interval: "60" },
+  { label: "4h", interval: "240" },
+  { label: "1D", interval: "D" },
+  { label: "1W", interval: "W" },
+];
+
+interface SidebarProps {
+  onSelectSymbol: (symbol: string) => void;
+  onSelectTimeframe: (interval: string) => void;
+  currentSymbol: string;
+  currentTimeframe: string;
+}
+
+const Sidebar = ({
+  onSelectSymbol,
+  onSelectTimeframe,
+  currentSymbol,
+  currentTimeframe,
+}: SidebarProps) => {
+  const [pairs, setPairs] = useState<Pair[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<SortField>("symbol");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [activeTab, setActiveTab] = useState<"trading" | "alerts">("trading");
+  const [alertPopup, setAlertPopup] = useState<string | null>(null);
+  const [alertValue, setAlertValue] = useState("");
+
+  useEffect(() => {
+    async function loadPairs() {
+      setLoading(true);
+      const info: ExchangeInfo = await fetch(
+        "https://api.binance.com/api/v3/exchangeInfo"
+      ).then((r) => r.json());
+      const stats: Ticker24hr[] = await fetch(
+        "https://api.binance.com/api/v3/ticker/24hr"
+      ).then((r) => r.json());
+      const usdt = new Set(
+        info.symbols
+          .filter((s) => s.quoteAsset === "USDT" && s.status === "TRADING")
+          .map((s) => s.symbol)
+      );
+      const pairsData = stats
+        .filter((t) => usdt.has(t.symbol))
+        .sort((a, b) => a.symbol.localeCompare(b.symbol));
+      setPairs(pairsData);
+      setLoading(false);
+    }
+    loadPairs();
+  }, []);
+
+  // Filter, sort
+  const filtered = pairs
+    .filter((t) => t.symbol.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const va: string | number =
+        sortField === "symbol" ? a.symbol : +a[sortField];
+      const vb: string | number =
+        sortField === "symbol" ? b.symbol : +b[sortField];
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+  // Đóng popup khi click ra ngoài
+  useEffect(() => {
+    const close = () => setAlertPopup(null);
+    if (alertPopup) {
+      window.addEventListener("click", close);
+      return () => window.removeEventListener("click", close);
+    }
+  }, [alertPopup]);
+
+  return (
+    <aside className="w-[300px] bg-[#1b1f27] border-l border-[#333] flex flex-col overflow-hidden h-full">
+      {/* Tiêu đề */}
+      <h2
+        className="p-4 text-[14px] uppercase tracking-wider border-b border-[#333]"
+        id="sidebar-title"
+      >
+        Cặp USDT (Binance): {pairs.length}
+      </h2>
+
+      {/* Tabs */}
+      <div id="sidebar-tabs" className="flex select-none">
+        <div
+          className={`tab flex-1 text-center py-2 cursor-pointer text-[13px] ${
+            activeTab === "trading"
+              ? "bg-[#111] text-white border-b-2 border-[#007acc]"
+              : "text-[#aaa] bg-[#1b1f27] border-b border-[#333]"
+          }`}
+          data-tab="trading"
+          onClick={() => setActiveTab("trading")}
+        >
+          Trading
+        </div>
+        <div
+          className={`tab flex-1 text-center py-2 cursor-pointer text-[13px] ${
+            activeTab === "alerts"
+              ? "bg-[#111] text-white border-b-2 border-[#007acc]"
+              : "text-[#aaa] bg-[#1b1f27] border-b border-[#333]"
+          }`}
+          data-tab="alerts"
+          onClick={() => setActiveTab("alerts")}
+        >
+          Alert Settings
+        </div>
+      </div>
+
+      {/* Tab: Trading */}
+      <div
+        id="trading"
+        className={`tab-content ${
+          activeTab === "trading" ? "flex" : "hidden"
+        } flex-col flex-1 overflow-hidden`}
+      >
+        {/* Timeframes */}
+        <div
+          id="timeframes"
+          className="flex flex-wrap px-4 py-2 gap-1 border-b border-[#333]"
+        >
+          {TIMEFRAMES.map((tf) => (
+            <div
+              key={tf.interval}
+              className={`timeframe px-2 py-1 text-[12px] rounded cursor-pointer text-white transition ${
+                currentTimeframe === tf.interval
+                  ? "bg-[#007acc]"
+                  : "bg-[#2a2e38]"
+              }`}
+              onClick={() => onSelectTimeframe(tf.interval)}
+            >
+              {tf.label}
+            </div>
+          ))}
+        </div>
+        {/* Search box */}
+        <input
+          id="pairSearch"
+          type="text"
+          placeholder="Search pairs..."
+          className="my-2 mx-4 px-2 py-2 rounded bg-[#2a2e38] text-white text-[13px] border-none outline-none placeholder:text-[#888]"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {/* Header row */}
+        <div
+          id="pairHeader"
+          className="grid grid-cols-[2fr_1fr_1fr_auto] px-4 py-2 text-[12px] text-[#aaa] border-b border-[#333] text-center"
+        >
+          <span
+            data-sort="symbol"
+            className={`text-left col-span-1 cursor-pointer select-none ${
+              sortField === "symbol"
+                ? sortDir === "asc"
+                  ? "sort-asc"
+                  : "sort-desc"
+                : ""
+            }`}
+            onClick={() => {
+              if (sortField === "symbol")
+                setSortDir(sortDir === "asc" ? "desc" : "asc");
+              else {
+                setSortField("symbol");
+                setSortDir("asc");
+              }
+            }}
+          >
+            Pair
+          </span>
+          <span
+            data-sort="lastPrice"
+            className={`cursor-pointer select-none ${
+              sortField === "lastPrice"
+                ? sortDir === "asc"
+                  ? "sort-asc"
+                  : "sort-desc"
+                : ""
+            }`}
+            onClick={() => {
+              if (sortField === "lastPrice")
+                setSortDir(sortDir === "asc" ? "desc" : "asc");
+              else {
+                setSortField("lastPrice");
+                setSortDir("asc");
+              }
+            }}
+          >
+            Price
+          </span>
+          <span
+            data-sort="priceChangePercent"
+            className={`cursor-pointer select-none ${
+              sortField === "priceChangePercent"
+                ? sortDir === "asc"
+                  ? "sort-asc"
+                  : "sort-desc"
+                : ""
+            }`}
+            onClick={() => {
+              if (sortField === "priceChangePercent")
+                setSortDir(sortDir === "asc" ? "desc" : "asc");
+              else {
+                setSortField("priceChangePercent");
+                setSortDir("asc");
+              }
+            }}
+          >
+            24h %
+          </span>
+          <span></span>
+        </div>
+        {/* Pair list */}
+        <div id="pairList" className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="text-center text-[#888] py-8">
+              Đang tải dữ liệu...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center text-[#888] py-8">
+              Không tìm thấy cặp nào
+            </div>
+          ) : (
+            filtered.map((t) => {
+              const symbol = `BINANCE:${t.symbol}`;
+              return (
+                <div
+                  key={t.symbol}
+                  className={`pair grid grid-cols-[2fr_1fr_1fr_auto] items-center px-4 py-2 text-[13px] border-b border-[#2a2e38] cursor-pointer transition ${
+                    symbol === currentSymbol
+                      ? "bg-[#243447]"
+                      : "hover:bg-[#2a2e38]"
+                  }`}
+                  onClick={(e) => {
+                    if (
+                      (e.target as HTMLElement).closest(".alert-icon") ||
+                      (e.target as HTMLElement).closest(".alert-popup")
+                    )
+                      return;
+                    onSelectSymbol(symbol);
+                  }}
+                >
+                  <span className="symbol truncate text-left whitespace-nowrap overflow-hidden">
+                    {t.symbol.replace("USDT", "/USDT")}
+                  </span>
+                  <span className="price text-right whitespace-nowrap overflow-hidden">
+                    {(+t.lastPrice).toFixed(4)}
+                  </span>
+                  <span
+                    className={`change text-right whitespace-nowrap ${
+                      +t.priceChangePercent >= 0
+                        ? "text-[#4caf50]"
+                        : "text-[#f44336]"
+                    }`}
+                  >
+                    {(+t.priceChangePercent).toFixed(2)}%
+                  </span>
+                  <span
+                    className="alert-icon pl-2 text-[16px] text-[#bbb] cursor-pointer relative flex items-center justify-end"
+                    title="Set Alert"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAlertPopup(symbol === alertPopup ? null : symbol);
+                      setAlertValue("");
+                    }}
+                  >
+                    🔔
+                    {/* Popup */}
+                    <div
+                      className={`alert-popup absolute top-full right-0 w-[180px] bg-[#1b1f27] border border-[#333] p-2 rounded z-10 shadow-lg ${
+                        alertPopup === symbol ? "block" : "hidden"
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Nhập giá cảnh báo"
+                        className="w-full px-2 py-1 rounded bg-[#2a2e38] text-white text-[13px] border-none outline-none"
+                        value={alertValue}
+                        onChange={(e) => setAlertValue(e.target.value)}
+                      />
+                      <button
+                        className="mt-2 w-full py-1 bg-[#007acc] rounded text-white text-[13px]"
+                        onClick={() => setAlertPopup(null)}
+                      >
+                        Lưu
+                      </button>
+                    </div>
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Tab: Alert Settings */}
+      <div
+        id="alerts"
+        className={`tab-content ${activeTab === "alerts" ? "flex" : "hidden"}`}
+      >
+        <p className="p-4 text-[#888]">
+          Chưa có cảnh báo nào.
+          <br />
+          (Sẽ load từ database)
+        </p>
+      </div>
+      <style jsx global>{`
+        #pairHeader span.sort-asc::after {
+          content: " ▲";
+          font-size: 10px;
+        }
+        #pairHeader span.sort-desc::after {
+          content: " ▼";
+          font-size: 10px;
+        }
+      `}</style>
+    </aside>
+  );
+};
+
+export default Sidebar;
