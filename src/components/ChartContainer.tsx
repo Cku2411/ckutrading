@@ -78,14 +78,14 @@ const ChartContainer = ({ symbol, interval }: ChartContainerProps) => {
         "mainSeriesProperties.candleStyle.wickUpColor": "rgba(5,102,86,1)",
         "mainSeriesProperties.candleStyle.wickDownColor": "rgba(5,102,86,1)",
       },
-      studies: [
-        "Moving Average Exponential@tv-basicstudies",
-        "Moving Average Exponential@tv-basicstudies",
-      ],
-      studies_overrides: {
-        "Moving Average Exponential@tv-basicstudies.length": 34,
-        "Moving Average Exponential@tv-basicstudies[1].length": 89,
-      },
+      // studies: [
+      //   "Moving Average Exponential@tv-basicstudies",
+      //   "Moving Average Exponential@tv-basicstudies",
+      // ],
+      // studies_overrides: {
+      //   "Moving Average Exponential@tv-basicstudies.length": 34,
+      //   "Moving Average Exponential@tv-basicstudies[1].length": 89,
+      // },
     });
     return () => {
       const container = document.getElementById(containerId);

@@ -1,35 +1,15 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-
-type Pair = {
-  symbol: string;
-  lastPrice: string;
-  priceChangePercent: string;
-};
-
-type ExchangeSymbol = {
-  symbol: string;
-  quoteAsset: string;
-  status: string;
-};
-
-type ExchangeInfo = {
-  symbols: ExchangeSymbol[];
-};
-
-type Ticker24hr = {
-  symbol: string;
-  lastPrice: string;
-  priceChangePercent: string;
-};
-
-type SortField = "symbol" | "lastPrice" | "priceChangePercent";
-
-type Timeframe = {
-  label: string;
-  interval: string;
-};
+import React, { useEffect, useState, useTransition } from "react";
+import { createAlertAction } from "@/app/actions/alert";
+import {
+  Pair,
+  ExchangeInfo,
+  ExchangeSymbol,
+  Ticker24hr,
+  SortField,
+  Timeframe,
+} from "@/lib/type";
 
 const TIMEFRAMES: Timeframe[] = [
   { label: "1m", interval: "1" },
@@ -61,8 +41,63 @@ const Sidebar = ({
   const [sortField, setSortField] = useState<SortField>("symbol");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [activeTab, setActiveTab] = useState<"trading" | "alerts">("trading");
-  const [alertPopup, setAlertPopup] = useState<string | null>(null);
   const [alertValue, setAlertValue] = useState("");
+  const [isPending, start] = useTransition();
+  const [priceInput, setPriceInput] = useState("");
+  const [alertPopup, setAlertPopup] = useState<{
+    symbol: string;
+    currentPrice: number;
+  } | null>(null);
+
+  // ===
+  // Lưu alert khi click Save
+  async function onSaveAlert() {
+    if (!currentSymbol) {
+      alert("Chưa chọn cặp để tạo alert");
+      return;
+    }
+
+    console.log({ alertValue });
+
+    const target = parseFloat(alertValue.trim());
+
+    // if (!isNaN(target)) {
+    //   alert("Vui lòng nhập giá hợp lệ!");
+    //   return;
+    // }
+
+    // // Lấy giá hiện tại từ DOM hoặc props (nếu bạn lưu lastPrice)
+    // const currentPriceEl = document.querySelector<HTMLSpanElement>(
+    //   ".pair.active .price"
+    // );
+    // const currentPrice = currentPriceEl
+    //   ? parseFloat(currentPriceEl.textContent || "")
+    //   : NaN;
+
+    // if (isNaN(currentPrice)) {
+    //   alert("Không lấy được giá hiện tại");
+    //   return;
+    // }
+
+    const currentPrice = 0.1;
+
+    // Xác định direction
+    const direction = target >= currentPrice ? "ABOVE" : "BELOW";
+
+    start(async () => {
+      try {
+        // Nếu dùng import: await createAlertAction(...)
+        // Nếu bạn truyền qua props: await createAlert(currentSymbol, target, direction)
+        await createAlertAction(currentSymbol, target, direction);
+
+        alert(`✅ Alert created: ${currentSymbol} ${direction} ${target}`);
+        setPriceInput("");
+      } catch (err: any) {
+        console.error(err);
+        alert("❌ Lỗi khi tạo alert: " + err.message);
+      }
+    });
+  }
 
   useEffect(() => {
     async function loadPairs() {
@@ -318,9 +353,9 @@ const Sidebar = ({
                       />
                       <button
                         className="mt-2 w-full py-1 bg-[#007acc] rounded text-white text-[13px]"
-                        onClick={() => setAlertPopup(null)}
+                        onClick={onSaveAlert}
                       >
-                        Lưu
+                        Save
                       </button>
                     </div>
                   </span>

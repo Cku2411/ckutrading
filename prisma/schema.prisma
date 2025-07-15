@@ -1,0 +1,29 @@
+// prisma/schema.prisma
+
+// 1. Generator: tạo Prisma Client
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 2. Datasource: Postgres (Neon)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 3. Enum hỗ trợ direction của alert
+enum AlertDirection {
+  ABOVE
+  BELOW
+}
+
+// 4. Model Alert
+model Alert {
+  id           Int            @id @default(autoincrement())
+  symbol       String         // ví dụ "BINANCE:BTCUSDT"
+  targetPrice  Float          // mức giá cảnh báo
+  direction    AlertDirection // ABOVE: giá trên, BELOW: giá dưới
+  isActive     Boolean        @default(true)  // còn hiệu lực
+  createdAt    DateTime       @default(now())
+  triggeredAt  DateTime?      // thời điểm đã fire alert
+}
