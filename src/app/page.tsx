@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import ChartContainer from "@/components/ChartContainer";
 import Sidebar from "@/components/Sidebar";
 import { useState } from "react";

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 type TradingViewWidgetOptions = {
   container_id: string | HTMLElement;
@@ -51,7 +51,7 @@ const ChartContainer = ({ symbol, interval }: ChartContainerProps) => {
     const container = document.getElementById(containerId);
     if (container) container.innerHTML = "";
     // @ts-expect-error: TradingView.widget không có type chính thức
-    const widget = new window.TradingView.widget({
+    new window.TradingView.widget({
       container_id: containerId,
       width: "100%",
       height: "100%",

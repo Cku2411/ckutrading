@@ -6,10 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "run-tele": "ts-node --esm ./src/sendTele.ts"
+  },
+  "type": "module",
+  "ts-node": {
+    "compilerOptions": {
+      "module": "ESNext"
+    }
   },
   "dependencies": {
     "@prisma/client": "^6.11.1",
+    "axios": "^1.10.0",
     "next": "15.4.1",
     "react": "19.1.0",
     "react-dom": "19.1.0"
@@ -24,6 +32,7 @@
     "eslint-config-next": "15.4.1",
     "prisma": "^6.11.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }

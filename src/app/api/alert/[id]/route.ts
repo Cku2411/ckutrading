@@ -2,13 +2,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-interface Params {
-  params: { id: string };
-}
-
 // PUT /api/alerts/:id
-export async function PUT(request: Request, { params }: Params) {
-  const id = Number(params.id);
+export async function PUT(
+  request: Request,
+  context: { params: { id: string } }
+) {
+  const id = Number(context.params.id);
   if (isNaN(id)) {
     return new NextResponse("Invalid ID", { status: 400 });
   }
@@ -32,8 +31,11 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 // DELETE /api/alerts/:id
-export async function DELETE(_request: Request, { params }: Params) {
-  const id = Number(params.id);
+export async function DELETE(
+  _request: Request,
+  context: { params: { id: string } }
+) {
+  const id = Number(context.params.id);
   if (isNaN(id)) {
     return new NextResponse("Invalid ID", { status: 400 });
   }

@@ -8,6 +8,7 @@ export type ExchangeSymbol = {
   symbol: string;
   quoteAsset: string;
   status: string;
+  filters: Array<{ filterType: string; tickSize: string }>;
 };
 
 export type ExchangeInfo = {
