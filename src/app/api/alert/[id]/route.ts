@@ -3,10 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // PUT /api/alerts/:id
-export async function PUT(
-  request: Request,
-  context: { params: { id: string } }
-) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function PUT(request: Request, context: any) {
   const id = Number(context.params.id);
   if (isNaN(id)) {
     return new NextResponse("Invalid ID", { status: 400 });
@@ -31,10 +29,8 @@ export async function PUT(
 }
 
 // DELETE /api/alerts/:id
-export async function DELETE(
-  _request: Request,
-  context: { params: { id: string } }
-) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function DELETE(_request: Request, context: any) {
   const id = Number(context.params.id);
   if (isNaN(id)) {
     return new NextResponse("Invalid ID", { status: 400 });

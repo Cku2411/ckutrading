@@ -105,9 +105,8 @@ const Sidebar = ({
   function getPrecision(tickSize: string) {
     const dec = tickSize.split(".")[1] || "";
     const idx = dec.indexOf("1");
-    return idx >= 0 ? dec.length - idx : dec.length;
+    return idx >= 0 ? idx + 1 : 0;
   }
-
   useEffect(() => {
     async function loadPairs() {
       setLoading(true);
@@ -148,6 +147,8 @@ const Sidebar = ({
           precision: getPrecision(tickSizeMap[t.symbol]),
         }))
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+      console.log({ pairsData });
 
       setPairs(pairsData);
       setLoading(false);
@@ -344,14 +345,14 @@ const Sidebar = ({
                     )
                       return;
                     onSelectSymbol(symbol);
-                    setCurrentPrice((+t.lastPrice).toFixed(4));
+                    setCurrentPrice((+t.lastPrice).toFixed(t.precision));
                   }}
                 >
                   <span className="symbol truncate text-left whitespace-nowrap overflow-hidden">
                     {t.symbol.replace("USDT", "/USDT")}
                   </span>
                   <span className="price text-right whitespace-nowrap overflow-hidden">
-                    {(+t.lastPrice).toFixed(6)}
+                    {(+t.lastPrice).toFixed(t.precision)}
                   </span>
                   <span
                     className={`change text-right whitespace-nowrap ${

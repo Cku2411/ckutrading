@@ -2,6 +2,7 @@ export type Pair = {
   symbol: string;
   lastPrice: string;
   priceChangePercent: string;
+  precision: number;
 };
 
 export type ExchangeSymbol = {
