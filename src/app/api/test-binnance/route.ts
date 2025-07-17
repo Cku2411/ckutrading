@@ -7,7 +7,7 @@ export async function GET() {
     const { data } = await axios.get(
       "https://api.binance.us/api/v3/ticker/price"
     );
-    return NextResponse.json({ prices: data });
+    return NextResponse.json({ prices: data, lengt: data.length });
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
       console.error(
