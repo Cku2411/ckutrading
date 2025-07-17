@@ -6,6 +6,10 @@ import { prisma } from "@/lib/prisma";
 const TELEGRAM_TOKEN = process.env.TG_TOKEN!;
 const CHAT_ID = process.env.TG_CHAT_ID!;
 
+console.log("🔍 check-alerts triggered");
+console.log("TG_TOKEN:", TELEGRAM_TOKEN ? "✅" : "❌ missing");
+console.log("CHAT_ID:", CHAT_ID ? "✅" : "❌ missing");
+
 // hàm gửi message qua Telegram
 async function sendTelegram(text: string) {
   try {
