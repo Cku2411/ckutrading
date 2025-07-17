@@ -8,10 +8,10 @@ export async function GET() {
       "https://api.binance.com/api/v3/ticker/price"
     );
     return NextResponse.json({ ok: true, count: data.length });
-  } catch (err: any) {
+  } catch (err) {
+    console.log(err);
     return NextResponse.json({
       ok: false,
-      error: err.response?.status || err.message,
     });
   }
 }
