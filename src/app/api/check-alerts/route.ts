@@ -1,4 +1,3 @@
-// app/api/check-alerts/route.ts
 import axios from "axios";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -6,85 +5,99 @@ import { prisma } from "@/lib/prisma";
 const TELEGRAM_TOKEN = process.env.TG_TOKEN!;
 const CHAT_ID = process.env.TG_CHAT_ID!;
 
-console.log("🔍 check-alerts triggered");
-console.log("TG_TOKEN:", TELEGRAM_TOKEN ? "✅" : "❌ missing");
-console.log("CHAT_ID:", CHAT_ID ? "✅" : "❌ missing");
-
-// hàm gửi message qua Telegram
 async function sendTelegram(text: string) {
   try {
-    await axios.post(
+    const res = await axios.post(
       `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
       { chat_id: CHAT_ID, text }
     );
-  } catch (err) {
-    console.error("❌ Telegram send error:", err);
+    console.log("✅ Telegram sent:", res.data);
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error(
+        "❌ Telegram send error:",
+        err.response?.data || err.message
+      );
+    } else {
+      console.error("❌ Telegram send error:", (err as Error).message);
+    }
   }
 }
 
+type BinancePrice = { symbol: string; price: string };
+
 export async function GET() {
+  console.log("🔍 check-alerts triggered");
+  console.log("TG_TOKEN:", TELEGRAM_TOKEN ? "✅" : "❌ missing");
+  console.log("CHAT_ID:", CHAT_ID ? "✅" : "❌ missing");
+
   try {
     // 1. Lấy tất cả alert đang active
     const alerts = await prisma.alert.findMany({
       where: { isActive: true },
     });
+    console.log("Found active alerts:", alerts.length);
+
     if (alerts.length === 0) {
       return NextResponse.json({ msg: "No active alerts" });
     }
 
-    // 2. Gom nhóm alerts theo symbol
-    const bySymbol = alerts.reduce<Record<string, typeof alerts>>((acc, a) => {
-      acc[a.symbol] ??= [];
-      acc[a.symbol].push(a);
+    // 2. Lấy toàn bộ giá từ Binance
+    const { data: allPrices } = await axios.get(
+      "https://api.binance.com/api/v3/ticker/price"
+    );
+
+    const priceMap = (allPrices as BinancePrice[]).reduce<
+      Record<string, number>
+    >((acc, item) => {
+      acc[item.symbol] = parseFloat(item.price);
       return acc;
     }, {});
 
-    // 3. Duyệt từng group để fetch price một lần
-    for (const [symbol, list] of Object.entries(bySymbol)) {
-      const pair = symbol.replace("BINANCE:", "");
-      let price: number;
+    // 3. Duyệt từng alert
+    let triggeredCount = 0;
+    for (const alert of alerts) {
+      const pair = alert.symbol.replace("BINANCE:", "");
+      const price = priceMap[pair];
 
-      try {
-        const { data } = await axios.get<{ price: string }>(
-          `https://api.binance.com/api/v3/ticker/price?symbol=${pair}`
-        );
-        price = parseFloat(data.price);
-      } catch (err) {
-        console.error(`❌ Error fetching price for ${symbol}:`, err);
+      if (price === undefined) {
+        console.warn(`⚠️ Price not found for ${pair}, skipping`);
         continue;
       }
 
-      // 4. Kiểm tra từng alert trong group
-      for (const alert of list) {
-        const isTriggered =
-          alert.direction === "ABOVE"
-            ? price >= alert.targetPrice
-            : price <= alert.targetPrice;
+      const isTriggered =
+        alert.direction === "ABOVE"
+          ? price >= alert.targetPrice
+          : price <= alert.targetPrice;
 
-        if (isTriggered) {
-          const text = `🔔 ${symbol} has ${
-            alert.direction === "ABOVE" ? "risen above" : "fallen below"
-          } ${alert.targetPrice}\nCurrent price: ${price}`;
+      if (isTriggered) {
+        const text = `🔔 ${alert.symbol} has ${
+          alert.direction === "ABOVE" ? "risen above" : "fallen below"
+        } ${alert.targetPrice}\nCurrent price: ${price}`;
 
-          // gửi Telegram
-          await sendTelegram(text);
+        await sendTelegram(text);
 
-          // đánh dấu đã fire
-          await prisma.alert.update({
-            where: { id: alert.id },
-            data: { isActive: false, triggeredAt: new Date() },
-          });
-        }
+        await prisma.alert.update({
+          where: { id: alert.id },
+          data: { isActive: false, triggeredAt: new Date() },
+        });
+
+        triggeredCount++;
       }
-
-      // delete all inActive
-      await prisma.alert.deleteMany({
-        where: { isActive: false },
-      });
     }
 
-    return NextResponse.json({ processed: alerts.length });
-  } catch (err) {
+    // 4. Xóa tất cả alert đã inactive
+    const deleted = await prisma.alert.deleteMany({
+      where: { isActive: false },
+    });
+    console.log(`🗑 Deleted ${deleted.count} inactive alerts`);
+
+    return NextResponse.json({
+      processed: alerts.length,
+      triggered: triggeredCount,
+      deleted: deleted.count,
+    });
+  } catch (err: unknown) {
     console.error("❌ /api/check-alerts error:", err);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
