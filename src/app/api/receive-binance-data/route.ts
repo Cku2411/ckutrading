@@ -21,6 +21,8 @@ async function sendTelegram(text: string) {
 }
 
 export async function POST(request: Request) {
+  console.log(`okie nhan post nhé`);
+
   try {
     const prices = await request.json(); // Binance price data from Worker
 
