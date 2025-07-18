@@ -15,7 +15,8 @@ async function sendTelegram(text: string) {
   } catch (err: unknown) {
     console.error(
       "❌ Telegram send error:",
-      (err as any)?.response?.data || (err as Error).message
+      (err as { response?: { data?: unknown } })?.response?.data ||
+        (err as Error).message
     );
   }
 }
