@@ -27,7 +27,7 @@ async function sendTelegram(text: string) {
   }
 }
 
-export async function POST() {
+export async function GET() {
   if (!WORKER_URL) {
     console.error("❌ WORKER_URL is not set in environment variables");
     return NextResponse.json(
