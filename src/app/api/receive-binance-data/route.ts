@@ -12,16 +12,22 @@ async function sendTelegram(text: string) {
       { chat_id: CHAT_ID, text }
     );
     console.log("✅ Telegram sent:", res.data);
-  } catch (err: unknown) {
-    console.error("❌ Telegram send error:", err);
+  } catch (err) {
+    console.error(
+      "❌ Telegram send error:",
+      (err as { response?: { data?: unknown } })?.response?.data ||
+        (err as Error).message
+    );
   }
 }
 
 type BinancePrice = { symbol: string; price: string };
 
 export async function POST(request: Request) {
+  console.log(`okie nhan post nhé`);
+
   try {
-    const allPrices = await request.json(); // Binance price data from Worker
+    const prices = await request.json(); // Binance price data from Worker
 
     // Reuse your existing alert logic
     const alerts = await prisma.alert.findMany({
@@ -32,12 +38,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ msg: "No active alerts" });
     }
 
-    const priceMap = (allPrices as BinancePrice[]).reduce<
-      Record<string, number>
-    >((acc, item) => {
-      acc[item.symbol] = parseFloat(item.price);
-      return acc;
-    }, {});
+    const priceMap = prices.reduce(
+      (
+        acc: Record<string, number>,
+        item: { symbol: string; price: string }
+      ) => {
+        acc[item.symbol] = parseFloat(item.price);
+        return acc;
+      },
+      {}
+    );
 
     // 3. Duyệt từng alert
     let triggeredCount = 0;
@@ -82,8 +92,8 @@ export async function POST(request: Request) {
       triggered: triggeredCount,
       deleted: deleted.count,
     });
-  } catch (err: unknown) {
-    console.error("❌ /api/check-alerts error:", err);
+  } catch (err) {
+    console.error("❌ /api/receive-binance-data error:", err);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
