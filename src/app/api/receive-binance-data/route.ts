@@ -63,9 +63,11 @@ export async function POST(request: Request) {
           : price <= alert.targetPrice;
 
       if (isTriggered) {
-        const text = `🔔 ${alert.symbol} has ${
+        const text = `🔔 *${alert.symbol}* has ${
           alert.direction === "ABOVE" ? "risen above" : "fallen below"
-        } ${alert.targetPrice}\nCurrent price: ${price}`;
+        } *${
+          alert.targetPrice
+        }*\nCurrent price: *${price}*\n[🔗 View Alert](https://mytrading-alert.vercel.app/)`;
 
         await sendTelegram(text);
 
