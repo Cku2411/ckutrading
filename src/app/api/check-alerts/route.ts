@@ -1,82 +1,92 @@
-import axios from "axios";
+// app/api/check-alerts/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import axios from "axios";
 
 const TELEGRAM_TOKEN = process.env.TG_TOKEN!;
 const CHAT_ID = process.env.TG_CHAT_ID!;
+const WORKER_URL = process.env.WORKER_URL;
+
+console.log(TELEGRAM_TOKEN, CHAT_ID, WORKER_URL);
+
+// URL Cloudflare Worker của bạn
+
+type WorkerPrice = {
+  pairs: string; // Ví dụ "BTCUSDT"
+  price: string; // Ví dụ "28650.12000000"
+};
 
 async function sendTelegram(text: string) {
   try {
-    const res = await axios.post(
+    await axios.post(
       `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
       { chat_id: CHAT_ID, text }
     );
-    console.log("✅ Telegram sent:", res.data);
   } catch (err: unknown) {
-    if (axios.isAxiosError(err)) {
-      console.error(
-        "❌ Telegram send error:",
-        err.response?.data || err.message
-      );
-    } else {
-      console.error("❌ Telegram send error:", (err as Error).message);
-    }
+    console.error("❌ Telegram send error:", err);
   }
 }
 
-type BinancePrice = { symbol: string; price: string };
-
-export async function GET() {
-  console.log("🔍 check-alerts triggered");
-  console.log("TG_TOKEN:", TELEGRAM_TOKEN ? "✅" : "❌ missing");
-  console.log("CHAT_ID:", CHAT_ID ? "✅" : "❌ missing");
-
+export async function POST() {
+  if (!WORKER_URL) {
+    console.error("❌ WORKER_URL is not set in environment variables");
+    return NextResponse.json(
+      { error: "WORKER_URL is not set" },
+      { status: 500 }
+    );
+  }
   try {
-    // 1. Lấy tất cả alert đang active
+    // 1. Lấy giá từ Cloudflare Worker
+    const workerRes = await fetch(WORKER_URL);
+    if (!workerRes.ok) {
+      console.error("❌ Worker fetch error:", await workerRes.text());
+      return NextResponse.json(
+        { error: "Failed to fetch prices" },
+        { status: 502 }
+      );
+    }
+    const workerJson = await workerRes.json();
+    const allPrices = (workerJson.data as WorkerPrice[]) || [];
+
+    console.log(`so luogn cap binnac: ${allPrices.length} cap`);
+
+    // 2. Lấy danh sách alert active
     const alerts = await prisma.alert.findMany({
       where: { isActive: true },
     });
-    console.log("Found active alerts:", alerts.length);
-
     if (alerts.length === 0) {
       return NextResponse.json({ msg: "No active alerts" });
     }
 
-    // 2. Lấy toàn bộ giá từ Binance
-    const { data: allPrices } = await axios.get(
-      "https://api.binance.com/api/v3/ticker/price"
-    );
-
-    const priceMap = (allPrices as BinancePrice[]).reduce<
-      Record<string, number>
-    >((acc, item) => {
-      acc[item.symbol] = parseFloat(item.price);
+    // 3. Chuyển mảng WorkerPrice thành map { "BTCUSDT": 28650.12, ... }
+    const priceMap: Record<string, number> = allPrices.reduce((acc, item) => {
+      acc[item.pairs] = parseFloat(item.price);
       return acc;
-    }, {});
+    }, {} as Record<string, number>);
 
-    // 3. Duyệt từng alert
+    // 4. Duyệt và xử lý từng alert
     let triggeredCount = 0;
     for (const alert of alerts) {
+      // symbol lưu trong DB dạng "BINANCE:BTCUSDT"
       const pair = alert.symbol.replace("BINANCE:", "");
-      const price = priceMap[pair];
+      const currentPrice = priceMap[pair];
 
-      if (price === undefined) {
-        console.warn(`⚠️ Price not found for ${pair}, skipping`);
+      if (currentPrice === undefined) {
+        console.warn(`⚠️ Price not found for ${pair}`);
         continue;
       }
 
       const isTriggered =
         alert.direction === "ABOVE"
-          ? price >= alert.targetPrice
-          : price <= alert.targetPrice;
+          ? currentPrice >= alert.targetPrice
+          : currentPrice <= alert.targetPrice;
 
       if (isTriggered) {
-        const text = `🔔 ${alert.symbol} has ${
-          alert.direction === "ABOVE" ? "risen above" : "fallen below"
-        } ${alert.targetPrice}\nCurrent price: ${price}`;
+        const directionText =
+          alert.direction === "ABOVE" ? "risen above" : "fallen below";
+        const text = `🔔 ${alert.symbol} has ${directionText} ${alert.targetPrice}\nCurrent price: ${currentPrice}`;
 
         await sendTelegram(text);
-
         await prisma.alert.update({
           where: { id: alert.id },
           data: { isActive: false, triggeredAt: new Date() },
@@ -86,11 +96,10 @@ export async function GET() {
       }
     }
 
-    // 4. Xóa tất cả alert đã inactive
+    // 5. Xóa toàn bộ alert đã inactive
     const deleted = await prisma.alert.deleteMany({
       where: { isActive: false },
     });
-    console.log(`🗑 Deleted ${deleted.count} inactive alerts`);
 
     return NextResponse.json({
       processed: alerts.length,
