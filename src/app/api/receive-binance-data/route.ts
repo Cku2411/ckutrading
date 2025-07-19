@@ -39,11 +39,8 @@ export async function POST(request: Request) {
     }
 
     const priceMap = prices.reduce(
-      (
-        acc: Record<string, number>,
-        item: { symbol: string; price: string }
-      ) => {
-        acc[item.symbol] = parseFloat(item.price);
+      (acc: Record<string, number>, item: { pairs: string; price: string }) => {
+        acc[item.pairs] = parseFloat(item.price);
         return acc;
       },
       {}
