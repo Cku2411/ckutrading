@@ -50,6 +50,8 @@ export async function POST(request: Request) {
     let triggeredCount = 0;
     for (const alert of alerts) {
       const pair = alert.symbol.replace("BINANCE:", "");
+      const tradingViewUrl = `https://www.tradingview.com/chart/?symbol=BINANCE:${pair}`;
+
       const price = priceMap[pair];
 
       if (price === undefined) {
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
           alert.direction === "ABOVE" ? "risen above" : "fallen below"
         } *${
           alert.targetPrice
-        }*\nCurrent price: *${price}*\n[🔗 View Alert](https://mytrading-alert.vercel.app/)`;
+        }*\nCurrent price: *${price}*\n[🔗 View Alert]$${tradingViewUrl}`;
 
         await sendTelegram(text);
 
