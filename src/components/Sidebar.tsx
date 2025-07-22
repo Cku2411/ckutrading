@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
+import { TfiReload } from "react-icons/tfi";
 import { createAlertAction } from "@/app/actions/alert";
 import {
   Pair,
@@ -236,22 +237,7 @@ const Sidebar = ({
           disabled={reloading}
           style={{ lineHeight: 0 }}
         >
-          <svg
-            width="20"
-            height="20"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke={reloading ? "#4caf50" : "#4caf50"}
-            style={{ transition: "stroke 0.2s" }}
-            className="reload-svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582M20 20v-5h-.581M5.062 19A9 9 0 1021 12.003"
-            />
-          </svg>
+          <TfiReload size={20} />
         </button>
       </div>
 
