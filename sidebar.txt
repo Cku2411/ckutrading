@@ -9,6 +9,12 @@ import {
   SortField,
   Timeframe,
 } from "@/lib/type";
+import SidebarTabs from "./sidebar/SidebarTabs";
+import TimeframeSelector from "./sidebar/TimeframeSelector";
+import PairSearchBox from "./sidebar/PairSearchBox";
+import AlertButton from "./sidebar/AlertButton";
+import PairList from "./sidebar/PairList";
+import AlertSettingsTab from "./sidebar/AlertSettingsTab";
 
 const TIMEFRAMES: Timeframe[] = [
   { label: "1m", interval: "1" },
@@ -47,6 +53,7 @@ const Sidebar = ({
     symbol: string;
     currentPrice: number;
   } | null>(null);
+  const [reloading, setReloading] = useState(false);
 
   // ===
   console.log({ currentPrice });
@@ -107,53 +114,46 @@ const Sidebar = ({
     const idx = dec.indexOf("1");
     return idx >= 0 ? idx + 1 : 0;
   }
+  // Refactor loadPairs ra ngoài useEffect để có thể gọi lại
+  async function loadPairs() {
+    setLoading(true);
+    setReloading(true);
+    // 1. Lấy exchangeInfo
+    const info: ExchangeInfo = await fetch(
+      "https://api.binance.com/api/v3/exchangeInfo"
+    ).then((r) => r.json());
+    // 2. Lấy 24h stats
+    const stats: Ticker24hr[] = await fetch(
+      "https://api.binance.com/api/v3/ticker/24hr"
+    ).then((r) => r.json());
+    // 3. Lọc cặp USDT đang trading và build map symbol → tickSize
+    const usdtSymbols = info.symbols.filter(
+      (s) => s.quoteAsset === "USDT" && s.status === "TRADING"
+    );
+    const tickSizeMap = usdtSymbols.reduce<Record<string, string>>((acc, s) => {
+      const priceFilter = s.filters.find(
+        (f) => f.filterType === "PRICE_FILTER"
+      );
+      acc[s.symbol] = priceFilter?.tickSize || "1";
+      return acc;
+    }, {});
+    const usdtSet = new Set(usdtSymbols.map((s) => s.symbol));
+    // 4. Map stats thành pairsData kèm precision
+    const pairsData = stats
+      .filter((t) => usdtSet.has(t.symbol))
+      .map((t) => ({
+        symbol: t.symbol,
+        lastPrice: t.lastPrice,
+        priceChangePercent: t.priceChangePercent,
+        precision: getPrecision(tickSizeMap[t.symbol]),
+      }))
+      .sort((a, b) => a.symbol.localeCompare(b.symbol));
+    setPairs(pairsData);
+    setLoading(false);
+    setReloading(false);
+  }
+
   useEffect(() => {
-    async function loadPairs() {
-      setLoading(true);
-
-      // 1. Lấy exchangeInfo
-      const info: ExchangeInfo = await fetch(
-        "https://api.binance.com/api/v3/exchangeInfo"
-      ).then((r) => r.json());
-
-      // 2. Lấy 24h stats
-      const stats: Ticker24hr[] = await fetch(
-        "https://api.binance.com/api/v3/ticker/24hr"
-      ).then((r) => r.json());
-
-      // 3. Lọc cặp USDT đang trading và build map symbol → tickSize
-      const usdtSymbols = info.symbols.filter(
-        (s) => s.quoteAsset === "USDT" && s.status === "TRADING"
-      );
-      const tickSizeMap = usdtSymbols.reduce<Record<string, string>>(
-        (acc, s) => {
-          const priceFilter = s.filters.find(
-            (f) => f.filterType === "PRICE_FILTER"
-          );
-          acc[s.symbol] = priceFilter?.tickSize || "1";
-          return acc;
-        },
-        {}
-      );
-      const usdtSet = new Set(usdtSymbols.map((s) => s.symbol));
-
-      // 4. Map stats thành pairsData kèm precision
-      const pairsData = stats
-        .filter((t) => usdtSet.has(t.symbol))
-        .map((t) => ({
-          symbol: t.symbol,
-          lastPrice: t.lastPrice,
-          priceChangePercent: t.priceChangePercent,
-          precision: getPrecision(tickSizeMap[t.symbol]),
-        }))
-        .sort((a, b) => a.symbol.localeCompare(b.symbol));
-
-      console.log({ pairsData });
-
-      setPairs(pairsData);
-      setLoading(false);
-    }
-
     loadPairs();
   }, []);
 
@@ -170,6 +170,43 @@ const Sidebar = ({
       return 0;
     });
 
+  // Lắng nghe phím arrow up/down ở toàn bộ Sidebar
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (filtered.length === 0) return;
+      if (
+        document.activeElement &&
+        (document.activeElement as HTMLElement).tagName === "INPUT"
+      )
+        return;
+      const idx = filtered.findIndex(
+        (t) => `BINANCE:${t.symbol}` === currentSymbol
+      );
+      if (e.key === "ArrowDown") {
+        const next = idx < filtered.length - 1 ? idx + 1 : 0;
+        const t = filtered[next];
+        if (t) {
+          onSelectSymbol(`BINANCE:${t.symbol}`);
+          setCurrentPrice((+t.lastPrice).toFixed(t.precision));
+          setAlertValue("");
+        }
+      } else if (e.key === "ArrowUp") {
+        const prev = idx > 0 ? idx - 1 : filtered.length - 1;
+        const t = filtered[prev];
+        if (t) {
+          onSelectSymbol(`BINANCE:${t.symbol}`);
+          setCurrentPrice((+t.lastPrice).toFixed(t.precision));
+          setAlertValue("");
+        }
+      }
+    }
+    const sidebar = document.getElementById("sidebar-root");
+    if (sidebar) sidebar.addEventListener("keydown", handleKeyDown);
+    return () => {
+      if (sidebar) sidebar.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [filtered, currentSymbol]);
+
   // Đóng popup khi click ra ngoài
   useEffect(() => {
     const close = () => setAlertPopup(null);
@@ -180,40 +217,46 @@ const Sidebar = ({
   }, [alertPopup]);
 
   return (
-    <aside className="w-[300px] bg-[#1b1f27] border-l border-[#333] flex flex-col overflow-hidden h-full">
+    <aside
+      id="sidebar-root"
+      tabIndex={0}
+      className="w-[300px] bg-[#1b1f27] border-l border-[#333] flex flex-col overflow-hidden h-full focus:outline-none"
+    >
       {/* Tiêu đề */}
-      <h2
-        className="p-4 text-[14px] uppercase tracking-wider border-b border-[#333]"
-        id="sidebar-title"
-      >
-        Cặp USDT (Binance): {pairs.length}
-      </h2>
+      <div className="flex items-center p-4 text-[14px] uppercase tracking-wider border-b border-[#333]">
+        <span id="sidebar-title" className="flex-1">
+          Cặp USDT (Binance): {pairs.length}
+        </span>
+        <button
+          className={`ml-2 p-1 rounded transition ${
+            reloading ? "animate-spin opacity-60" : "hover:bg-[#222]"
+          }`}
+          title="Reload pairs"
+          onClick={loadPairs}
+          disabled={reloading}
+          style={{ lineHeight: 0 }}
+        >
+          <svg
+            width="20"
+            height="20"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke={reloading ? "#4caf50" : "#4caf50"}
+            style={{ transition: "stroke 0.2s" }}
+            className="reload-svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582M20 20v-5h-.581M5.062 19A9 9 0 1021 12.003"
+            />
+          </svg>
+        </button>
+      </div>
 
       {/* Tabs */}
-      <div id="sidebar-tabs" className="flex select-none">
-        <div
-          className={`tab flex-1 text-center py-2 cursor-pointer text-[13px] ${
-            activeTab === "trading"
-              ? "bg-[#111] text-white border-b-2 border-[#007acc]"
-              : "text-[#aaa] bg-[#1b1f27] border-b border-[#333]"
-          }`}
-          data-tab="trading"
-          onClick={() => setActiveTab("trading")}
-        >
-          Trading
-        </div>
-        <div
-          className={`tab flex-1 text-center py-2 cursor-pointer text-[13px] ${
-            activeTab === "alerts"
-              ? "bg-[#111] text-white border-b-2 border-[#007acc]"
-              : "text-[#aaa] bg-[#1b1f27] border-b border-[#333]"
-          }`}
-          data-tab="alerts"
-          onClick={() => setActiveTab("alerts")}
-        >
-          Alert Settings
-        </div>
-      </div>
+      <SidebarTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* Tab: Trading */}
       <div
@@ -223,33 +266,21 @@ const Sidebar = ({
         } flex-col flex-1 overflow-hidden`}
       >
         {/* Timeframes */}
-        <div
-          id="timeframes"
-          className="flex flex-wrap px-4 py-2 gap-1 border-b border-[#333]"
-        >
-          {TIMEFRAMES.map((tf) => (
-            <div
-              key={tf.interval}
-              className={`timeframe px-2 py-1 text-[12px] rounded cursor-pointer text-white transition ${
-                currentTimeframe === tf.interval
-                  ? "bg-[#007acc]"
-                  : "bg-[#2a2e38]"
-              }`}
-              onClick={() => onSelectTimeframe(tf.interval)}
-            >
-              {tf.label}
-            </div>
-          ))}
-        </div>
-        {/* Search box */}
-        <input
-          id="pairSearch"
-          type="text"
-          placeholder="Search pairs..."
-          className="my-2 mx-4 px-2 py-2 rounded bg-[#2a2e38] text-white text-[13px] border-none outline-none placeholder:text-[#888]"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        <TimeframeSelector
+          timeframes={TIMEFRAMES}
+          currentTimeframe={currentTimeframe}
+          onSelectTimeframe={onSelectTimeframe}
         />
+        {/* Search box + AlertButton */}
+        <PairSearchBox search={search} setSearch={setSearch}>
+          <AlertButton
+            currentSymbol={currentSymbol}
+            currentPrice={currentPrice}
+            alertValue={alertValue}
+            setAlertValue={setAlertValue}
+            onSaveAlert={onSaveAlert}
+          />
+        </PairSearchBox>
         {/* Header row */}
         <div
           id="pairHeader"
@@ -318,107 +349,17 @@ const Sidebar = ({
           <span></span>
         </div>
         {/* Pair list */}
-        <div id="pairList" className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="text-center text-[#888] py-8">
-              Đang tải dữ liệu...
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center text-[#888] py-8">
-              Không tìm thấy cặp nào
-            </div>
-          ) : (
-            filtered.map((t) => {
-              const symbol = `BINANCE:${t.symbol}`;
-              return (
-                <div
-                  key={t.symbol}
-                  className={`pair grid grid-cols-[2fr_1fr_1fr_auto] items-center px-4 py-2 text-[13px] border-b border-[#2a2e38] cursor-pointer transition text-center ${
-                    symbol === currentSymbol
-                      ? "bg-[#243447]"
-                      : "hover:bg-[#2a2e38]"
-                  }`}
-                  onClick={(e) => {
-                    if (
-                      (e.target as HTMLElement).closest(".alert-icon") ||
-                      (e.target as HTMLElement).closest(".alert-popup")
-                    )
-                      return;
-                    onSelectSymbol(symbol);
-                    setCurrentPrice((+t.lastPrice).toFixed(t.precision));
-                  }}
-                >
-                  <span className="symbol truncate text-left whitespace-nowrap overflow-hidden">
-                    {t.symbol.replace("USDT", "/USDT")}
-                  </span>
-                  <span className="price text-right whitespace-nowrap overflow-hidden">
-                    {(+t.lastPrice).toFixed(t.precision)}
-                  </span>
-                  <span
-                    className={`change text-right whitespace-nowrap ${
-                      +t.priceChangePercent >= 0
-                        ? "text-[#4caf50]"
-                        : "text-[#f44336]"
-                    }`}
-                  >
-                    {(+t.priceChangePercent).toFixed(2)}%
-                  </span>
-                  <span
-                    className="alert-icon pl-2 text-[16px] text-[#bbb] cursor-pointer relative flex items-center justify-end"
-                    title="Set Alert"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (alertPopup && alertPopup.symbol === symbol) {
-                        setAlertPopup(null);
-                      } else {
-                        setAlertPopup({ symbol, currentPrice: +t.lastPrice });
-                      }
-                      setAlertValue("");
-                    }}
-                  >
-                    🔔
-                    {/* Popup */}
-                    <div
-                      className={`alert-popup absolute top-full right-0 w-[180px] bg-[#1b1f27] border border-[#333] p-2 rounded z-10 shadow-lg ${
-                        alertPopup && alertPopup.symbol === symbol
-                          ? "block"
-                          : "hidden"
-                      }`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Nhập giá cảnh báo"
-                        className="w-full px-2 py-1 rounded bg-[#2a2e38] text-white text-[13px] border-none outline-none"
-                        value={alertValue}
-                        onChange={(e) => setAlertValue(e.target.value)}
-                      />
-                      <button
-                        className="mt-2 w-full py-1 bg-[#007acc] rounded text-white text-[13px]"
-                        onClick={onSaveAlert}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <PairList
+          filtered={filtered}
+          currentSymbol={currentSymbol}
+          onSelectSymbol={onSelectSymbol}
+          setCurrentPrice={setCurrentPrice}
+          setAlertValue={setAlertValue}
+        />
       </div>
 
       {/* Tab: Alert Settings */}
-      <div
-        id="alerts"
-        className={`tab-content ${activeTab === "alerts" ? "flex" : "hidden"}`}
-      >
-        <p className="p-4 text-[#888]">
-          Chưa có cảnh báo nào.
-          <br />
-          (Sẽ load từ database)
-        </p>
-      </div>
+      {activeTab === "alerts" && <AlertSettingsTab />}
       <style jsx global>{`
         #pairHeader span.sort-asc::after {
           content: " ▲";
@@ -427,6 +368,9 @@ const Sidebar = ({
         #pairHeader span.sort-desc::after {
           content: " ▼";
           font-size: 10px;
+        }
+        .reload-svg:hover {
+          stroke: #81c784 !important;
         }
       `}</style>
     </aside>

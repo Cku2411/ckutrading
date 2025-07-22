@@ -359,7 +359,10 @@ const Sidebar = ({
       </div>
 
       {/* Tab: Alert Settings */}
-      {activeTab === "alerts" && <AlertSettingsTab />}
+      {activeTab === "alerts" && (
+        <AlertSettingsTab onSelectSymbol={onSelectSymbol} />
+      )}
+
       <style jsx global>{`
         #pairHeader span.sort-asc::after {
           content: " ▲";
