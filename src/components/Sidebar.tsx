@@ -16,6 +16,7 @@ import PairSearchBox from "./sidebar/PairSearchBox";
 import AlertButton from "./sidebar/AlertButton";
 import PairList from "./sidebar/PairList";
 import AlertSettingsTab from "./sidebar/AlertSettingsTab";
+import { toast } from "sonner";
 
 const TIMEFRAMES: Timeframe[] = [
   { label: "1m", interval: "1" },
@@ -60,52 +61,98 @@ const Sidebar = ({
   console.log({ currentPrice });
 
   // Lưu alert khi click Save
+  // async function onSaveAlert() {
+  //   if (!currentSymbol) {
+  //     alert("Chưa chọn cặp để tạo alert");
+  //     return;
+  //   }
+
+  //   console.log({ alertValue });
+
+  //   const target = parseFloat(alertValue.trim());
+
+  //   // if (!isNaN(target)) {
+  //   //   alert("Vui lòng nhập giá hợp lệ!");
+  //   //   return;
+  //   // }
+
+  //   // // Lấy giá hiện tại từ DOM hoặc props (nếu bạn lưu lastPrice)
+  //   // const currentPriceEl = document.querySelector<HTMLSpanElement>(
+  //   //   ".pair.active .price"
+  //   // );
+  //   // const currentPrice = currentPriceEl
+  //   //   ? parseFloat(currentPriceEl.textContent || "")
+  //   //   : NaN;
+
+  //   // if (isNaN(currentPrice)) {
+  //   //   alert("Không lấy được giá hiện tại");
+  //   //   return;
+  //   // }
+
+  //   // Xác định direction
+  //   const direction = target >= parseFloat(currentPrice) ? "ABOVE" : "BELOW";
+  //   console.log({ target, currentPrice });
+
+  //   start(async () => {
+  //     try {
+  //       // Nếu dùng import: await createAlertAction(...)
+  //       // Nếu bạn truyền qua props: await createAlert(currentSymbol, target, direction)
+  //       await createAlertAction(currentSymbol, target, direction);
+
+  //       alert(`✅ Alert created: ${currentSymbol} ${direction} ${target}`);
+  //     } catch (err: unknown) {
+  //       console.error(err);
+  //       if (err instanceof Error) {
+  //         alert("❌ Lỗi khi tạo alert: " + err.message);
+  //       } else {
+  //         alert("❌ Lỗi khi tạo alert không xác định");
+  //       }
+  //     }
+  //   });
+  // }
+
   async function onSaveAlert() {
     if (!currentSymbol) {
-      alert("Chưa chọn cặp để tạo alert");
+      toast.error("🚫 Vui lòng chọn cặp để tạo alert");
       return;
     }
 
-    console.log({ alertValue });
-
     const target = parseFloat(alertValue.trim());
 
-    // if (!isNaN(target)) {
-    //   alert("Vui lòng nhập giá hợp lệ!");
-    //   return;
-    // }
+    if (isNaN(target)) {
+      toast.error("⛔️ Vui lòng nhập giá hợp lệ!");
+      return;
+    }
 
-    // // Lấy giá hiện tại từ DOM hoặc props (nếu bạn lưu lastPrice)
-    // const currentPriceEl = document.querySelector<HTMLSpanElement>(
-    //   ".pair.active .price"
-    // );
-    // const currentPrice = currentPriceEl
-    //   ? parseFloat(currentPriceEl.textContent || "")
-    //   : NaN;
+    if (!currentPrice || isNaN(parseFloat(currentPrice))) {
+      toast.error("⚠️ Không lấy được giá hiện tại");
+      return;
+    }
 
-    // if (isNaN(currentPrice)) {
-    //   alert("Không lấy được giá hiện tại");
-    //   return;
-    // }
-
-    // Xác định direction
     const direction = target >= parseFloat(currentPrice) ? "ABOVE" : "BELOW";
-    console.log({ target, currentPrice });
 
     start(async () => {
       try {
-        // Nếu dùng import: await createAlertAction(...)
-        // Nếu bạn truyền qua props: await createAlert(currentSymbol, target, direction)
         await createAlertAction(currentSymbol, target, direction);
 
-        alert(`✅ Alert created: ${currentSymbol} ${direction} ${target}`);
+        toast.success(`✅ Đã tạo alert cho ${currentSymbol}`, {
+          description: `${
+            direction === "ABOVE" ? "Khi tăng vượt" : "Khi giảm dưới"
+          } ${target}`,
+        });
+
+        setAlertValue(""); // optional: reset sau khi tạo
       } catch (err: unknown) {
-        console.error(err);
-        if (err instanceof Error) {
-          alert("❌ Lỗi khi tạo alert: " + err.message);
-        } else {
-          alert("❌ Lỗi khi tạo alert không xác định");
-        }
+        console.error("❌ Lỗi tạo alert", err);
+
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Lỗi không xác định khi tạo alert";
+
+        toast.error("🚫 Không thể tạo alert", {
+          description: msg,
+        });
       }
     });
   }

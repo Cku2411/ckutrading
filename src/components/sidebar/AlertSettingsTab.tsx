@@ -70,11 +70,14 @@ const AlertSettingsTab: React.FC<Props> = ({ onSelectSymbol }) => {
   }
 
   return (
-    <div id="alerts" className="tab-content flex flex-col gap-3 p-4">
+    <div
+      id="alerts"
+      className="tab-content flex flex-col gap-3 p-4 overflow-y-scroll overflow-x-hidden scrollbar-thin scrollbar-thumb-[#2a2e38] scrollbar-track-[#1b1f27]"
+    >
       {alerts.map((alert) => (
         <div
           key={alert.id}
-          className="flex items-center justify-between p-4 border rounded-md  hover:bg-[#2a2e38] bg-[#1b1f27]"
+          className="flex items-center justify-between p-4 border rounded-md  hover:bg-[#2a2e38] bg-[#1b1f27] "
         >
           <div
             className="cursor-pointer"
