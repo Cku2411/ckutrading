@@ -51,7 +51,7 @@ const PairList: React.FC<PairListProps> = ({
             >
               {(+t.priceChangePercent).toFixed(2)}%
             </span>
-            <span></span>
+            {/* <span></span> */}
             <a
               href={`https://www.tradingview.com/chart/?symbol=BINANCE:${t.symbol}`}
               target="_blank"
