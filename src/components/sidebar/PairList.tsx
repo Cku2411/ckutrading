@@ -21,6 +21,7 @@ const PairList: React.FC<PairListProps> = ({
   setAlertValue,
 }) => (
   <div id="pairList" className="flex-1 overflow-y-auto">
+    {/* // <div id={`pair-${currentSymbol}`} className="flex-1 overflow-y-auto"> */}
     {filtered.length === 0 ? (
       <div className="text-center text-[#888] py-8">Không tìm thấy cặp nào</div>
     ) : (
@@ -29,6 +30,7 @@ const PairList: React.FC<PairListProps> = ({
         return (
           <div
             key={t.symbol}
+            id={`pair-${t.symbol}`}
             className={`pair grid grid-cols-[2fr_1fr_1fr_auto] items-center px-4 py-2 text-[13px] border-b border-[#2a2e38] cursor-pointer transition text-center ${
               symbol === currentSymbol ? "bg-[#243447]" : "hover:bg-[#2a2e38]"
             }`}

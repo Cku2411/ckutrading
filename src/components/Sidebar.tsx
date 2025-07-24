@@ -222,32 +222,58 @@ const Sidebar = ({
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (filtered.length === 0) return;
+
+      // Nếu đang nhập thì không xử lý
       if (
         document.activeElement &&
         (document.activeElement as HTMLElement).tagName === "INPUT"
       )
         return;
+
       const idx = filtered.findIndex(
         (t) => `BINANCE:${t.symbol}` === currentSymbol
       );
+
+      let nextIdx = idx;
+
       if (e.key === "ArrowDown") {
-        const next = idx < filtered.length - 1 ? idx + 1 : 0;
-        const t = filtered[next];
-        if (t) {
-          onSelectSymbol(`BINANCE:${t.symbol}`);
-          setCurrentPrice((+t.lastPrice).toFixed(t.precision));
-          setAlertValue("");
-        }
+        nextIdx = idx < filtered.length - 1 ? idx + 1 : 0;
       } else if (e.key === "ArrowUp") {
-        const prev = idx > 0 ? idx - 1 : filtered.length - 1;
-        const t = filtered[prev];
-        if (t) {
-          onSelectSymbol(`BINANCE:${t.symbol}`);
-          setCurrentPrice((+t.lastPrice).toFixed(t.precision));
-          setAlertValue("");
-        }
+        nextIdx = idx > 0 ? idx - 1 : filtered.length - 1;
+      } else {
+        return;
+      }
+
+      const targetPair = filtered[nextIdx];
+      if (targetPair) {
+        const nextSymbol = `BINANCE:${targetPair.symbol}`;
+        onSelectSymbol(nextSymbol);
+        setCurrentPrice((+targetPair.lastPrice).toFixed(targetPair.precision));
+        setAlertValue("");
+
+        // ✅ Scroll nếu phần tử nằm ngoài vùng hiển thị
+        setTimeout(() => {
+          const el = document.getElementById(`pair-${targetPair.symbol}`);
+          const container = document.getElementById("pairList");
+          if (el && container) {
+            const elRect = el.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            const isOutOfView =
+              elRect.top < containerRect.top ||
+              elRect.bottom > containerRect.bottom;
+
+            if (isOutOfView) {
+              el.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+          }
+        }, 50);
       }
     }
+
     const sidebar = document.getElementById("sidebar-root");
     if (sidebar) sidebar.addEventListener("keydown", handleKeyDown);
     return () => {
