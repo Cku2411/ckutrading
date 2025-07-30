@@ -23,7 +23,7 @@ export async function GET() {
     const metas = await metasRes.json();
 
     return NextResponse.json({ tickers, metas });
-  } catch (err: any) {
-    return NextResponse.json({ message: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ message: err }, { status: 500 });
   }
 }
