@@ -59,7 +59,7 @@ const PairList: React.FC<PairListProps> = ({
             </span>
             {/* <span></span> */}
             <a
-              href={`https://www.tradingview.com/chart/?symbol=BINANCE:${t.symbol}`}
+              href={`https://www.tradingview.com/chart/?symbol=${symbol}`}
               target="_blank"
               rel="noopener noreferrer"
               className="ml-2 text-[#007acc] hover:text-[#005fa3] flex items-center"
