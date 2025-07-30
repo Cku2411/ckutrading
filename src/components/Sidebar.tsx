@@ -165,22 +165,27 @@ const Sidebar = ({
 
   // Lắng nghe phím arrow up/down ở toàn bộ Sidebar
   useEffect(() => {
+    function formatSymbol(source: string, rawSymbol: string): string {
+      const formatSourece = source === "binance" ? "BINANCE" : "GATEIO";
+      // Chuẩn hoá symbol để tránh lỗi TradingView với "/usdt"
+      const cleanSymbol = rawSymbol.replace("/", "").toUpperCase();
+      const prefix = formatSourece.toUpperCase(); // "BINANCE" hoặc "GATEIO"
+      return `${prefix}:${cleanSymbol}`;
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
       if (filtered.length === 0) return;
 
-      // Nếu đang nhập thì không xử lý
       if (
         document.activeElement &&
         (document.activeElement as HTMLElement).tagName === "INPUT"
       )
         return;
 
-      const idx = filtered.findIndex(
-        (t) =>
-          (source === "binance"
-            ? `BINANCE:${t.symbol}`
-            : `GATEIO:${t.symbol}`) === currentSymbol
-      );
+      const idx = filtered.findIndex((t) => {
+        const formatted = formatSymbol(source, t.symbol);
+        return formatted === currentSymbol;
+      });
 
       let nextIdx = idx;
 
@@ -194,12 +199,11 @@ const Sidebar = ({
 
       const targetPair = filtered[nextIdx];
       if (targetPair) {
-        const nextSymbol = `BINANCE:${targetPair.symbol}`;
+        const nextSymbol = formatSymbol(source, targetPair.symbol);
         onSelectSymbol(nextSymbol);
         setCurrentPrice((+targetPair.lastPrice).toFixed(targetPair.precision));
         setAlertValue("");
 
-        // ✅ Scroll nếu phần tử nằm ngoài vùng hiển thị
         setTimeout(() => {
           const el = document.getElementById(`pair-${targetPair.symbol}`);
           const container = document.getElementById("pairList");
@@ -222,11 +226,8 @@ const Sidebar = ({
       }
     }
 
-    const sidebar = document.getElementById("sidebar-root");
-    if (sidebar) sidebar.addEventListener("keydown", handleKeyDown);
-    return () => {
-      if (sidebar) sidebar.removeEventListener("keydown", handleKeyDown);
-    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [filtered, currentSymbol, source]);
 
   // Đóng popup khi click ra ngoài
