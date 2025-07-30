@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, useTransition } from "react";
 import { TfiReload } from "react-icons/tfi";
+import { getBinancePairs } from "@/lib/binance";
+import { getGatePairs } from "@/lib/gate";
 import { createAlertAction } from "@/app/actions/alert";
 import {
   Pair,
@@ -34,6 +36,8 @@ interface SidebarProps {
   onSelectTimeframe: (interval: string) => void;
   currentSymbol: string;
   currentTimeframe: string;
+  source: "binance" | "gate";
+  setSource: (s: "binance" | "gate") => void;
 }
 
 const Sidebar = ({
@@ -41,8 +45,11 @@ const Sidebar = ({
   onSelectTimeframe,
   currentSymbol,
   currentTimeframe,
+  source,
+  setSource,
 }: SidebarProps) => {
   const [pairs, setPairs] = useState<Pair[]>([]);
+  // const [source, setSource] = useState<"binance" | "gate">("binance");
   const [loading, setLoading] = useState(true);
   const [currentPrice, setCurrentPrice] = useState("");
   const [search, setSearch] = useState("");
@@ -59,57 +66,6 @@ const Sidebar = ({
 
   // ===
   console.log({ currentPrice });
-
-  // Lưu alert khi click Save
-  // async function onSaveAlert() {
-  //   if (!currentSymbol) {
-  //     alert("Chưa chọn cặp để tạo alert");
-  //     return;
-  //   }
-
-  //   console.log({ alertValue });
-
-  //   const target = parseFloat(alertValue.trim());
-
-  //   // if (!isNaN(target)) {
-  //   //   alert("Vui lòng nhập giá hợp lệ!");
-  //   //   return;
-  //   // }
-
-  //   // // Lấy giá hiện tại từ DOM hoặc props (nếu bạn lưu lastPrice)
-  //   // const currentPriceEl = document.querySelector<HTMLSpanElement>(
-  //   //   ".pair.active .price"
-  //   // );
-  //   // const currentPrice = currentPriceEl
-  //   //   ? parseFloat(currentPriceEl.textContent || "")
-  //   //   : NaN;
-
-  //   // if (isNaN(currentPrice)) {
-  //   //   alert("Không lấy được giá hiện tại");
-  //   //   return;
-  //   // }
-
-  //   // Xác định direction
-  //   const direction = target >= parseFloat(currentPrice) ? "ABOVE" : "BELOW";
-  //   console.log({ target, currentPrice });
-
-  //   start(async () => {
-  //     try {
-  //       // Nếu dùng import: await createAlertAction(...)
-  //       // Nếu bạn truyền qua props: await createAlert(currentSymbol, target, direction)
-  //       await createAlertAction(currentSymbol, target, direction);
-
-  //       alert(`✅ Alert created: ${currentSymbol} ${direction} ${target}`);
-  //     } catch (err: unknown) {
-  //       console.error(err);
-  //       if (err instanceof Error) {
-  //         alert("❌ Lỗi khi tạo alert: " + err.message);
-  //       } else {
-  //         alert("❌ Lỗi khi tạo alert không xác định");
-  //       }
-  //     }
-  //   });
-  // }
 
   async function onSaveAlert() {
     if (!currentSymbol) {
@@ -166,36 +122,15 @@ const Sidebar = ({
   async function loadPairs() {
     setLoading(true);
     setReloading(true);
-    // 1. Lấy exchangeInfo
-    const info: ExchangeInfo = await fetch(
-      "https://api.binance.com/api/v3/exchangeInfo"
-    ).then((r) => r.json());
-    // 2. Lấy 24h stats
-    const stats: Ticker24hr[] = await fetch(
-      "https://api.binance.com/api/v3/ticker/24hr"
-    ).then((r) => r.json());
-    // 3. Lọc cặp USDT đang trading và build map symbol → tickSize
-    const usdtSymbols = info.symbols.filter(
-      (s) => s.quoteAsset === "USDT" && s.status === "TRADING"
-    );
-    const tickSizeMap = usdtSymbols.reduce<Record<string, string>>((acc, s) => {
-      const priceFilter = s.filters.find(
-        (f) => f.filterType === "PRICE_FILTER"
-      );
-      acc[s.symbol] = priceFilter?.tickSize || "1";
-      return acc;
-    }, {});
-    const usdtSet = new Set(usdtSymbols.map((s) => s.symbol));
-    // 4. Map stats thành pairsData kèm precision
-    const pairsData = stats
-      .filter((t) => usdtSet.has(t.symbol))
-      .map((t) => ({
-        symbol: t.symbol,
-        lastPrice: t.lastPrice,
-        priceChangePercent: t.priceChangePercent,
-        precision: getPrecision(tickSizeMap[t.symbol]),
-      }))
-      .sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+    const pairsData =
+      source === "gate" ? await getGatePairs() : await getBinancePairs();
+
+    // source === "binance" ? await getBinancePairs() : await getGatePairs();
+
+    console.log({ source });
+    console.log({ pairsData });
+
     setPairs(pairsData);
     setLoading(false);
     setReloading(false);
@@ -203,7 +138,9 @@ const Sidebar = ({
 
   useEffect(() => {
     loadPairs();
-  }, []);
+    // Reset search khi đổi sàn
+    setSearch("");
+  }, [source]);
 
   // Filter, sort
   const filtered = pairs
@@ -218,6 +155,14 @@ const Sidebar = ({
       return 0;
     });
 
+  // Xử lý chọn cặp
+  function handleSelectPair(pair: Pair) {
+    const prefix = source === "binance" ? "BINANCE:" : "GATEIO:";
+    onSelectSymbol(`${prefix}${pair.symbol}`);
+    setCurrentPrice((+pair.lastPrice).toFixed(pair.precision));
+    setAlertValue("");
+  }
+
   // Lắng nghe phím arrow up/down ở toàn bộ Sidebar
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -231,7 +176,10 @@ const Sidebar = ({
         return;
 
       const idx = filtered.findIndex(
-        (t) => `BINANCE:${t.symbol}` === currentSymbol
+        (t) =>
+          (source === "binance"
+            ? `BINANCE:${t.symbol}`
+            : `GATEIO:${t.symbol}`) === currentSymbol
       );
 
       let nextIdx = idx;
@@ -279,7 +227,7 @@ const Sidebar = ({
     return () => {
       if (sidebar) sidebar.removeEventListener("keydown", handleKeyDown);
     };
-  }, [filtered, currentSymbol]);
+  }, [filtered, currentSymbol, source]);
 
   // Đóng popup khi click ra ngoài
   useEffect(() => {
@@ -299,8 +247,18 @@ const Sidebar = ({
       {/* Tiêu đề */}
       <div className="flex items-center p-4 text-[14px] uppercase tracking-wider border-b border-[#333]">
         <span id="sidebar-title" className="flex-1">
-          Cặp USDT (Binance): {pairs.length}
+          Cặp USDT ({source}): {pairs.length}
         </span>
+
+        <select
+          value={source}
+          onChange={(e) => setSource(e.target.value as "binance" | "gate")}
+          className="mb-2 p-1 bg-[#1b1f27] text-white"
+        >
+          <option value="binance">Binance</option>
+          <option value="gate">Gate.io</option>
+        </select>
+
         <button
           className={`ml-2 p-1 rounded transition ${
             reloading ? "animate-spin opacity-60" : "hover:bg-[#222]"
@@ -414,6 +372,7 @@ const Sidebar = ({
           onSelectSymbol={onSelectSymbol}
           setCurrentPrice={setCurrentPrice}
           setAlertValue={setAlertValue}
+          source={source}
         />
       </div>
 

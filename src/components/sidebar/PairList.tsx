@@ -11,6 +11,7 @@ interface PairListProps {
   onSelectSymbol: (symbol: string) => void;
   setCurrentPrice: (price: string) => void;
   setAlertValue: (v: string) => void;
+  source: "binance" | "gate"; // Thêm prop này
 }
 
 const PairList: React.FC<PairListProps> = ({
@@ -19,6 +20,7 @@ const PairList: React.FC<PairListProps> = ({
   onSelectSymbol,
   setCurrentPrice,
   setAlertValue,
+  source,
 }) => (
   <div id="pairList" className="flex-1 overflow-y-auto">
     {/* // <div id={`pair-${currentSymbol}`} className="flex-1 overflow-y-auto"> */}
@@ -26,7 +28,9 @@ const PairList: React.FC<PairListProps> = ({
       <div className="text-center text-[#888] py-8">Không tìm thấy cặp nào</div>
     ) : (
       filtered.map((t) => {
-        const symbol = `BINANCE:${t.symbol}`;
+        const prefix = source === "binance" ? "BINANCE:" : "GATEIO:";
+        // const symbol = `${prefix}${t.symbol}`;
+        const symbol = `${prefix}${t.symbol.replace(/[_/]/g, "")}`;
         return (
           <div
             key={t.symbol}
@@ -41,7 +45,7 @@ const PairList: React.FC<PairListProps> = ({
             }}
           >
             <span className="symbol truncate text-left whitespace-nowrap overflow-hidden">
-              {t.symbol.replace("USDT", "/USDT")}
+              {t.symbol.replace(/[_/]/g, "").replace(/(USDT)$/, "/$1")}
             </span>
             <span className="price text-right whitespace-nowrap overflow-hidden">
               {(+t.lastPrice).toFixed(t.precision)}

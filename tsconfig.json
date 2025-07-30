@@ -27,7 +27,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "src/sendTele.js"
+    "src/sendTele.js",
+    "src/app/api/gate-pairs"
   ],
   "exclude": ["node_modules"]
 }
