@@ -1,25 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-
-type TradingViewWidgetOptions = {
-  container_id: string | HTMLElement;
-  width: string | number;
-  height: string | number;
-  symbol: string;
-  interval: string;
-  timezone: string;
-  theme: string;
-  style: string;
-  locale: string;
-  toolbar_bg: string;
-  enable_publishing: boolean;
-  hide_top_toolbar: boolean;
-  hide_side_toolbar: boolean;
-  save_image: boolean;
-  overrides: Record<string, unknown>;
-  studies: string[];
-  studies_overrides: Record<string, unknown>;
-};
+import { TradingViewWidgetOptions } from "@/lib/type";
 
 declare global {
   interface Window {
@@ -78,14 +59,6 @@ const ChartContainer = ({ symbol, interval }: ChartContainerProps) => {
         "mainSeriesProperties.candleStyle.wickUpColor": "rgba(5,102,86,1)",
         "mainSeriesProperties.candleStyle.wickDownColor": "rgba(5,102,86,1)",
       },
-      // studies: [
-      //   "Moving Average Exponential@tv-basicstudies",
-      //   "Moving Average Exponential@tv-basicstudies",
-      // ],
-      // studies_overrides: {
-      //   "Moving Average Exponential@tv-basicstudies.length": 34,
-      //   "Moving Average Exponential@tv-basicstudies[1].length": 89,
-      // },
     });
     return () => {
       const container = document.getElementById(containerId);

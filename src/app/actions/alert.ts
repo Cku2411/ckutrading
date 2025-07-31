@@ -25,7 +25,7 @@ export async function getActiveAlertsAction() {
   // optional: chỉnh sửa dữ liệu nếu cần
   return alerts.map((a) => ({
     id: a.id,
-    symbol: a.symbol.replace("BINANCE:", ""),
+    symbol: a.symbol,
     direction: a.direction,
     targetPrice: a.targetPrice,
   }));

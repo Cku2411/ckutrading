@@ -21,7 +21,7 @@ async function sendTelegram(text: string) {
   }
 }
 
-type BinancePrice = { symbol: string; price: string };
+// type BinancePrice = { symbol: string; price: string };
 
 export async function POST(request: Request) {
   console.log(`okie nhan post nhé`);

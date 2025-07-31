@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cku Trading",
+  title: "Cku Trading | Trading Alerts",
   description: "Binance Usdt trading pairs",
 };
 

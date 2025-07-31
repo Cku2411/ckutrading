@@ -81,7 +81,7 @@ const AlertSettingsTab: React.FC<Props> = ({ onSelectSymbol }) => {
         >
           <div
             className="cursor-pointer"
-            onClick={() => onSelectSymbol(`BINANCE:${alert.symbol}`)}
+            onClick={() => onSelectSymbol(`${alert.symbol}`)}
           >
             <p className="text-lg font-medium">{alert.symbol}</p>
             <p className="text-sm text-gray-600">

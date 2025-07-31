@@ -1,43 +1,30 @@
 "use client";
 
-import React, { useEffect, useState, useTransition } from "react";
+import React, { useCallback, useEffect, useState, useTransition } from "react";
 import { TfiReload } from "react-icons/tfi";
 import { getBinancePairs } from "@/lib/binance";
 import { getGatePairs } from "@/lib/gate";
+import { getSymbolPrefix, normalizeSymbol } from "@/lib/symbol";
 import { createAlertAction } from "@/app/actions/alert";
-import {
-  Pair,
-  ExchangeInfo,
-  Ticker24hr,
-  SortField,
-  Timeframe,
-} from "@/lib/type";
+import { TIMEFRAMES } from "@/lib/constant";
+import { useGlobalArrowNavigation } from "@/lib/hooks";
+import { Pair, SortField, Source } from "@/lib/type";
+import { toast } from "sonner";
+
 import SidebarTabs from "./sidebar/SidebarTabs";
 import TimeframeSelector from "./sidebar/TimeframeSelector";
 import PairSearchBox from "./sidebar/PairSearchBox";
 import AlertButton from "./sidebar/AlertButton";
 import PairList from "./sidebar/PairList";
 import AlertSettingsTab from "./sidebar/AlertSettingsTab";
-import { toast } from "sonner";
-
-const TIMEFRAMES: Timeframe[] = [
-  { label: "1m", interval: "1" },
-  { label: "5m", interval: "5" },
-  { label: "15m", interval: "15" },
-  { label: "30m", interval: "30" },
-  { label: "1h", interval: "60" },
-  { label: "4h", interval: "240" },
-  { label: "1D", interval: "D" },
-  { label: "1W", interval: "W" },
-];
 
 interface SidebarProps {
   onSelectSymbol: (symbol: string) => void;
   onSelectTimeframe: (interval: string) => void;
   currentSymbol: string;
   currentTimeframe: string;
-  source: "binance" | "gate";
-  setSource: (s: "binance" | "gate") => void;
+  source: Source;
+  setSource: (source: Source) => void;
 }
 
 const Sidebar = ({
@@ -49,8 +36,6 @@ const Sidebar = ({
   setSource,
 }: SidebarProps) => {
   const [pairs, setPairs] = useState<Pair[]>([]);
-  // const [source, setSource] = useState<"binance" | "gate">("binance");
-  const [loading, setLoading] = useState(true);
   const [currentPrice, setCurrentPrice] = useState("");
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("symbol");
@@ -65,8 +50,6 @@ const Sidebar = ({
   const [reloading, setReloading] = useState(false);
 
   // ===
-  console.log({ currentPrice });
-
   async function onSaveAlert() {
     if (!currentSymbol) {
       toast.error("🚫 Vui lòng chọn cặp để tạo alert");
@@ -113,28 +96,14 @@ const Sidebar = ({
     });
   }
 
-  function getPrecision(tickSize: string) {
-    const dec = tickSize.split(".")[1] || "";
-    const idx = dec.indexOf("1");
-    return idx >= 0 ? idx + 1 : 0;
-  }
   // Refactor loadPairs ra ngoài useEffect để có thể gọi lại
-  async function loadPairs() {
-    setLoading(true);
+  const loadPairs = useCallback(async () => {
     setReloading(true);
-
     const pairsData =
       source === "gate" ? await getGatePairs() : await getBinancePairs();
-
-    // source === "binance" ? await getBinancePairs() : await getGatePairs();
-
-    console.log({ source });
-    console.log({ pairsData });
-
     setPairs(pairsData);
-    setLoading(false);
     setReloading(false);
-  }
+  }, [source]);
 
   useEffect(() => {
     loadPairs();
@@ -142,93 +111,29 @@ const Sidebar = ({
     setSearch("");
   }, [source]);
 
-  // Filter, sort
-  const filtered = pairs
-    .filter((t) => t.symbol.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      const va: string | number =
-        sortField === "symbol" ? a.symbol : +a[sortField];
-      const vb: string | number =
-        sortField === "symbol" ? b.symbol : +b[sortField];
-      if (va < vb) return sortDir === "asc" ? -1 : 1;
-      if (va > vb) return sortDir === "asc" ? 1 : -1;
+  // Filter, sort pair
+  const filteredPairs = pairs
+    .filter((pair) => pair.symbol.toLowerCase().includes(search.toLowerCase()))
+    .sort((pairA, pairB) => {
+      const valueA: string | number =
+        sortField === "symbol" ? pairA.symbol : +pairA[sortField];
+      const valueB: string | number =
+        sortField === "symbol" ? pairB.symbol : +pairB[sortField];
+
+      if (valueA < valueB) return sortDir === "asc" ? -1 : 1;
+      if (valueA > valueB) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
 
-  // Xử lý chọn cặp
-  function handleSelectPair(pair: Pair) {
-    const prefix = source === "binance" ? "BINANCE:" : "GATEIO:";
-    onSelectSymbol(`${prefix}${pair.symbol}`);
-    setCurrentPrice((+pair.lastPrice).toFixed(pair.precision));
-    setAlertValue("");
-  }
-
   // Lắng nghe phím arrow up/down ở toàn bộ Sidebar
-  useEffect(() => {
-    function formatSymbol(source: string, rawSymbol: string): string {
-      const formatSourece = source === "binance" ? "BINANCE" : "GATEIO";
-      // Chuẩn hoá symbol để tránh lỗi TradingView với "/usdt"
-      const cleanSymbol = rawSymbol.replace("/", "").toUpperCase();
-      const prefix = formatSourece.toUpperCase(); // "BINANCE" hoặc "GATEIO"
-      return `${prefix}:${cleanSymbol}`;
-    }
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (filtered.length === 0) return;
-
-      if (
-        document.activeElement &&
-        (document.activeElement as HTMLElement).tagName === "INPUT"
-      )
-        return;
-
-      const idx = filtered.findIndex((t) => {
-        const formatted = formatSymbol(source, t.symbol);
-        return formatted === currentSymbol;
-      });
-
-      let nextIdx = idx;
-
-      if (e.key === "ArrowDown") {
-        nextIdx = idx < filtered.length - 1 ? idx + 1 : 0;
-      } else if (e.key === "ArrowUp") {
-        nextIdx = idx > 0 ? idx - 1 : filtered.length - 1;
-      } else {
-        return;
-      }
-
-      const targetPair = filtered[nextIdx];
-      if (targetPair) {
-        const nextSymbol = formatSymbol(source, targetPair.symbol);
-        onSelectSymbol(nextSymbol);
-        setCurrentPrice((+targetPair.lastPrice).toFixed(targetPair.precision));
-        setAlertValue("");
-
-        setTimeout(() => {
-          const el = document.getElementById(`pair-${targetPair.symbol}`);
-          const container = document.getElementById("pairList");
-          if (el && container) {
-            const elRect = el.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-
-            const isOutOfView =
-              elRect.top < containerRect.top ||
-              elRect.bottom > containerRect.bottom;
-
-            if (isOutOfView) {
-              el.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
-            }
-          }
-        }, 50);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filtered, currentSymbol, source]);
+  useGlobalArrowNavigation({
+    source,
+    filteredPairs,
+    currentSymbol,
+    onSelectSymbol,
+    setCurrentPrice,
+    setAlertValue,
+  });
 
   // Đóng popup khi click ra ngoài
   useEffect(() => {
@@ -253,8 +158,8 @@ const Sidebar = ({
 
         <select
           value={source}
-          onChange={(e) => setSource(e.target.value as "binance" | "gate")}
-          className="mb-2 p-1 bg-[#1b1f27] text-white"
+          onChange={(e) => setSource(e.target.value as Source)}
+          className="mb-2 p-1 bg-[#1b1f27] text-white hover:bg-[#333]"
         >
           <option value="binance">Binance</option>
           <option value="gate">Gate.io</option>
@@ -262,14 +167,14 @@ const Sidebar = ({
 
         <button
           className={`ml-2 p-1 rounded transition ${
-            reloading ? "animate-spin opacity-60" : "hover:bg-[#222]"
+            reloading ? "animate-spin opacity-60" : "hover:bg-[#333]"
           }`}
           title="Reload pairs"
           onClick={loadPairs}
           disabled={reloading}
           style={{ lineHeight: 0 }}
         >
-          <TfiReload size={20} />
+          <TfiReload size={20} className="text-yellow-400 " />
         </button>
       </div>
 
@@ -368,7 +273,7 @@ const Sidebar = ({
         </div>
         {/* Pair list */}
         <PairList
-          filtered={filtered}
+          filteredPairs={filteredPairs}
           currentSymbol={currentSymbol}
           onSelectSymbol={onSelectSymbol}
           setCurrentPrice={setCurrentPrice}

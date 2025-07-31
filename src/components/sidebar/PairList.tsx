@@ -1,7 +1,8 @@
 import React from "react";
+import { getSymbolPrefix, normalizeSymbol, displaySymbol } from "@/lib/symbol";
 
 interface PairListProps {
-  filtered: Array<{
+  filteredPairs: Array<{
     symbol: string;
     lastPrice: string;
     priceChangePercent: string;
@@ -11,11 +12,11 @@ interface PairListProps {
   onSelectSymbol: (symbol: string) => void;
   setCurrentPrice: (price: string) => void;
   setAlertValue: (v: string) => void;
-  source: "binance" | "gate"; // Thêm prop này
+  source: "binance" | "gate";
 }
 
 const PairList: React.FC<PairListProps> = ({
-  filtered,
+  filteredPairs,
   currentSymbol,
   onSelectSymbol,
   setCurrentPrice,
@@ -23,48 +24,47 @@ const PairList: React.FC<PairListProps> = ({
   source,
 }) => (
   <div id="pairList" className="flex-1 overflow-y-auto">
-    {/* // <div id={`pair-${currentSymbol}`} className="flex-1 overflow-y-auto"> */}
-    {filtered.length === 0 ? (
+    {filteredPairs.length === 0 ? (
       <div className="text-center text-[#888] py-8">Không tìm thấy cặp nào</div>
     ) : (
-      filtered.map((t) => {
-        const prefix = source === "binance" ? "BINANCE:" : "GATEIO:";
-        // const symbol = `${prefix}${t.symbol}`;
-        const symbol = `${prefix}${t.symbol.replace(/[_/]/g, "")}`;
+      filteredPairs.map((pair) => {
+        // xu ly symbol tu api
+        const symbol = getSymbolPrefix(source) + normalizeSymbol(pair.symbol);
         return (
           <div
-            key={t.symbol}
-            id={`pair-${t.symbol}`}
+            key={pair.symbol}
+            id={`pair-${pair.symbol}`}
             className={`pair grid grid-cols-[2fr_1fr_1fr_auto] items-center px-4 py-2 text-[13px] border-b border-[#2a2e38] cursor-pointer transition text-center ${
               symbol === currentSymbol ? "bg-[#243447]" : "hover:bg-[#2a2e38]"
             }`}
             onClick={() => {
               onSelectSymbol(symbol);
-              setCurrentPrice((+t.lastPrice).toFixed(t.precision));
+              setCurrentPrice((+pair.lastPrice).toFixed(pair.precision));
               setAlertValue("");
             }}
           >
             <span className="symbol truncate text-left whitespace-nowrap overflow-hidden">
-              {t.symbol.replace(/[_/]/g, "").replace(/(USDT)$/, "/$1")}
+              {displaySymbol(pair.symbol)}
             </span>
             <span className="price text-right whitespace-nowrap overflow-hidden">
-              {(+t.lastPrice).toFixed(t.precision)}
+              {(+pair.lastPrice).toFixed(pair.precision)}
             </span>
             <span
               className={`change text-right whitespace-nowrap ${
-                +t.priceChangePercent >= 0 ? "text-[#4caf50]" : "text-[#f44336]"
+                +pair.priceChangePercent >= 0
+                  ? "text-[#4caf50]"
+                  : "text-[#f44336]"
               }`}
             >
-              {(+t.priceChangePercent).toFixed(2)}%
+              {(+pair.priceChangePercent).toFixed(2)}%
             </span>
-            {/* <span></span> */}
             <a
               href={`https://www.tradingview.com/chart/?symbol=${symbol}`}
               target="_blank"
               rel="noopener noreferrer"
               className="ml-2 text-[#007acc] hover:text-[#005fa3] flex items-center"
               title="Xem biểu đồ TradingView"
-              onClick={(e) => e.stopPropagation()} // Để không trigger chọn cặp khi bấm link
+              onClick={(e) => e.stopPropagation()}
             >
               🔗
             </a>
